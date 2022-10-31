@@ -1,4 +1,4 @@
-#include "Voltage/Voltage.h"
+#include "Voltage.h"
 
 Voltage::Voltage(int sample_rate, double referenceV){
     this->referencev =  referenceV; 
