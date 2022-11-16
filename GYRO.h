@@ -1,10 +1,10 @@
 #pragma once
 //#include <Wire.h>
 #include <Adafruit_Sensor.h>
-//#include <Adafruit_BNO055.h>
-//#include <utility/imumaths.h>
+#include <Adafruit_BNO055.h>
+#include <utility/imumaths.h>
 
-class GYRO: public Adafruit_BNO055{// inheritance
+class GYRO : public Adafruit_BNO055 { // inheritance
     //private
     Adafruit_BNO055 gyro;
     sensors_event_t orientationData, magnetometerData; 
