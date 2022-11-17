@@ -2,6 +2,8 @@
 #include "SparkFunMPL3115A2.h"
 #include "Voltage.h"
 #include "GYRO.h" 
+#include "SoftwareSerial.h"
+
 #define teamID 1073 //Team Id
 //for time
 /* Useful Constants */
@@ -17,6 +19,11 @@
 #define numberOfMinutes(_time_) ((_time_ / SECS_PER_MIN) % SECS_PER_MIN) 
 #define numberOfHours(_time_) (( _time_% SECS_PER_DAY) / SECS_PER_HOUR) 
 
+#define rxPin 0
+#define txPin 1 
+
+SoftwareSerial mySerial (rxPin, txPin); 
+
 //Create an instance of the objects
 MPL3115A2 myPressure;
 Voltage voltMeter(10, 5.015);
@@ -27,6 +34,8 @@ int packetCount = 0;
 
 int timeT = 0;
 int currentMil = 0; 
+
+bool start = false; 
 
 String stateList [10] = {
   "LAUNCH_WAIT",
@@ -59,29 +68,46 @@ char mast_deployed[2] = {78,77}; // M - Heat sheild deployed N -otherwise
 bool mast_bool = false ;
 
 float findState(float alt1, float alt2, int &currState, int &count); 
+void getALT_BAR(float pres);
+
 
 float alt1 = 0; 
 float alt2 = 1;
 
 float avgAlt = 0; 
+int station_Level = 0;
 
 //GYRO Storage
 double* gdata; 
 
 //Commands to payload
-//CMD,<TEAM_ID>,CX,<ON_OFF>
-//CMD,<TEAM_ID>,ST,<UTC_TIME>|GPS  UTC_Time or GPS
-//CMD,<TEAM_ID>,SIM,<MODE>
-//CMD,<TEAM ID>,SIMP,<PRESSURE>
-//CAL - Calibrate Altitude to Zero
+//CMD,<TEAM_ID>,CX,<ON_OFF> -> 0
+//CMD,<TEAM_ID>,ST,<UTC_TIME>|GPS  UTC_Time or GPS ->1
+//CMD,<TEAM_ID>,SIM,<MODE> ->2
+//CMD,<TEAM ID>,SIMP,<PRESSURE>  -> 3
+//CAL - Calibrate Altitude to Zero ->4 
 //OPTIONAL - Optional Commands
 
+
+int* parseString( const String &myData);
 void setup (){
+  Serial.begin(9600); // This is assuming the 
+  mySerial.begin(9600); 
+  while(!start){
+     while(Serial.available() == 0) {
+    }
+    const String mydata = Serial.readString();
+    //String mydata = mySerial.readString();
+  }
+  
+ 
+    
   pinMode(2, OUTPUT);
   // Wait for something that turns it on
   Wire.begin();
-  Serial.begin(9600);
+  
   delay(100); 
+  Serial.println("");
   Serial.println("Starting...."); 
 
   // Get sensors online
@@ -95,7 +121,7 @@ void setup (){
   //Configure the sensor
   myPressure.setModeAltimeter(); // Measure altitude above sea level in meters
   myPressure.setOversampleRate(7); // Set Oversample to the recommended 128
-  const int groundLevel_m = 50;
+  station_Level = 0; //gps altittude;
   delay (1000);
 }
 
@@ -103,11 +129,11 @@ void setup (){
 void loop() {
   
    if (mode){ // flight mode 
-     alt1 = myPressure.readAltitude();
+     alt1 = myPressure.readAltitude()- station_Level;
      delay(5);
-     alt2 = myPressure.readAltitude();   
+     alt2 = myPressure.readAltitude()-station_Level;   
    }
-   else if (!mode && !simp)  { //simulation 
+   else if (!mode && !simp)  { //simulation for now
     if (accent == true && alt1 < 750){
       alt1++;
       alt2++;
@@ -285,4 +311,14 @@ float findState(float alt1, float alt2, int &currSate, int &count){
       }           
       return altAvg; 
 
+}
+
+int* parseString( const String &myData){
+  String curr = ""; 
+  for(int i = 0; i < myData.length(); i++){ 
+    if (myData[i] != 56){
+      curr += myData[i];
+    }
+  }
+  
 }
