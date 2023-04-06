@@ -9,6 +9,7 @@ from datetime import datetime
 import matplotlib.dates as mdates
 import csv
 import serial.tools.list_ports
+import re
 
 def saveCSVfile(data): # Saves telemetry data to CSV file
     header = ['TEAM_ID', 'MISSION_TIME', 'PACKET_COUNT', 'MODE', 'STATE', 'ALTITUDE', 'HS_DEPLOYED', 'PC_DEPLOYED', 'MAST_RAISED', 'TEMPERATURE', 'VOLTAGE', 'GPS_TIME', 'GPS_ALTITUDE', 'GPS_LATITUDE', 'GPS_LONGITUDE', 'GPS_SATS', 'TILT_X', 'TILT_Y', 'CMD_ECHO']
@@ -117,7 +118,7 @@ simulationData = [] # Stores all simulation data (list of lists)
 backupData = readBackupData() # Stores the backup data (read from a file)
 simulatedPressureData = readSimulationData() # Stores the simulated pressure data (read from a file)
 TEAM_ID = '1071'
-MISSION_TIME = 0
+MISSION_TIME = ""
 PACKET_COUNT = 0
 MODE = 'F'
 STATE = 'LAUNCH_WAIT'
@@ -214,7 +215,6 @@ _VARS['window'] = sg.Window('CanSat GUI',
                             resizable=True,
                             location=(100, 100),
                             font = ("Rockwell", 13),
-                            # element_justification="c",
                             margins=(300,0))
 
 def drawChart(name): # Draws graph
@@ -225,7 +225,7 @@ def drawChart(name): # Draws graph
     if (backupMode == True): 
         dataXY = getSpecificBackupData(name)
         if name != 'gps': # Format the x-axis for all figures NOT gps
-            yearss_fmt = mdates.DateFormatter('%M:%S')
+            yearss_fmt = mdates.DateFormatter('%H:%M:%S')
             ax.xaxis.set_major_formatter(yearss_fmt)
         finalX = [] # Stores the x data to plot
         finalY = [] # Store the y data to plot
@@ -252,7 +252,7 @@ def drawChart(name): # Draws graph
     elif (simulationMode == True):
         dataXY = getSpecificSimulationData(name)
         if name != 'gps': # Format the x-axis for all figures NOT gps
-            yearss_fmt = mdates.DateFormatter('%M:%S')
+            yearss_fmt = mdates.DateFormatter('%H:%M:%S')
             ax.xaxis.set_major_formatter(yearss_fmt)
         finalX = [] # Stores the x data to plot
         finalY = [] # Store the y data to plot
@@ -357,7 +357,6 @@ while True:
                     _VARS['window']['heatshield'].update('Heat Shield Deployed: N')
                     _VARS['window']['parachute'].update('Parachute Deployed: N')
                     _VARS['window']['mast'].update('Mast Raised: N')
-                    _VARS['window']['echo'].update('Command Echo: ')
                     _VARS['window']['mode'].update('Mode: F')
                     _VARS['window']['packet_count'].update('Packet Count: 0') 
                     _VARS['window']['simActivate'].update(visible = False)
@@ -377,13 +376,26 @@ while True:
                 # Power OFF CanSat
                 elif (CMD_ECHO == 'CMD,1071,CX,OFF'):
                     isCanSatON = False
+                    _VARS['window']['Power ON'].update('Power ON', button_color='#00b300')
                     saveCSVfile(telemetryData)
                 # Power ON CanSat
                 elif (CMD_ECHO == 'CMD,1071,CX,ON'):
                     isCanSatON = True
                     # Reset telemetry data?
                     telemetryData = []
-
+                    _VARS['window']['Power ON'].update('Power OFF', button_color='#DA3A3A')
+                # Set time
+                elif ('CMD,1071,ST' in CMD_ECHO):
+                    if ('GPS' in CMD_ECHO):
+                        # Set FSW time to the current time read from the GPS module
+                        MISSION_TIME = str(datetime.now().strftime("%H:%M:%S"))
+                    else:
+                        utc_time_pattern = re.compile(r'\b\d{2}:\d{2}:\d{2}\b')
+                        utc_times = re.findall(utc_time_pattern, CMD_ECHO)
+                        if utc_times:
+                            # Set FSW time to the value utc_times
+                            MISSION_TIME = str(utc_times[0])
+                    print(MISSION_TIME)
                 # Send command!
                 sendXBeeCommand(CMD_ECHO)
                 time.sleep(1)
@@ -394,6 +406,9 @@ while True:
     # Calibrate
     elif event == 'Calibrate': 
         GPS_ALTITUDE = 0
+        CMD_ECHO = 'CMD,1071,CAL'
+        _VARS['window']['echo'].update('Command Echo: ' + str(CMD_ECHO)) # Update the command echo element to display the previously entered command
+        _VARS['window']['cmdInput'].update('')  # This resets the input bar to be empty
         try:
             for item in figure_names: # Reset each of the 4 figures
                 updateChart(item) 
@@ -452,16 +467,25 @@ while True:
     # If user activates simulation mode
     if event == 'simActivate': 
         simulationMode = True
+        CMD_ECHO = 'CMD,1071,SIM,ACTIVATE'
+        _VARS['window']['echo'].update('Command Echo: ' + str(CMD_ECHO)) # Update the command echo element to display the previously entered command
+        _VARS['window']['cmdInput'].update('')  # This resets the input bar to be empty
         start = datetime.now()
         seconds = 0
     # If user enables/disables simulation mode
     elif event == 'simEnable': 
         if not simulationMode and not simulationActivation:
+            CMD_ECHO = 'CMD,1071,SIM,ENABLE'
+            _VARS['window']['echo'].update('Command Echo: ' + str(CMD_ECHO)) # Update the command echo element to display the previously entered command
+            _VARS['window']['cmdInput'].update('')  # This resets the input bar to be empty
             _VARS['window']['simEnable'].update('Disable Simulation', button_color='#DA3A3A')
             _VARS['window']['simActivate'].update(visible = True)
             simulationMode = False
             simulationActivation = True
         elif simulationMode or simulationActivation:
+            CMD_ECHO = 'CMD,1071,SIM,DISABLE'
+            _VARS['window']['echo'].update('Command Echo: ' + str(CMD_ECHO)) # Update the command echo element to display the previously entered command
+            _VARS['window']['cmdInput'].update('')  # This resets the input bar to be empty
             simulationMode = False
             simulationActivation = False
             for item in figure_names: # Reset each of the 4 figures
@@ -470,7 +494,6 @@ while True:
             _VARS['window']['heatshield'].update('Heat Shield Deployed: N')
             _VARS['window']['parachute'].update('Parachute Deployed: N')
             _VARS['window']['mast'].update('Mast Raised: N')
-            _VARS['window']['echo'].update('Command Echo: ')
             _VARS['window']['mode'].update('Mode: F')
             _VARS['window']['packet_count'].update('Packet Count: 0') 
             _VARS['window']['simActivate'].update(visible = False)
