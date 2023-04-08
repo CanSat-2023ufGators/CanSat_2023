@@ -17,14 +17,6 @@ def saveCSVfile(data): # Saves telemetry data to CSV file
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(data)
-def addXBeeInput(input, data): # Takes input (string) and appends it to data (list of lists)
-    input = input.split(',')
-    tempLine = []
-    for item in input:
-        tempLine.append(item)
-    data.append(tempLine)
-    return data
-
 def readSimulationData(): # Reads simulation pressure data
     simulatedPressureData = []
     f = open("cansat_2023_simp.txt", "r")
@@ -154,7 +146,8 @@ portVar = None
 # portVar = input("Enter the port (e.g. \"COM11\"): ")
 
 # # Initialize serial object thing
-# serialInst.baudrate = 9600
+serialInst.baudrate = 9600
+serialInst.timeout = 0 # Try 1?
 # serialInst.port = portVar
 # try:
 #     serialInst.open()
@@ -168,7 +161,38 @@ def sendXBeeCommand(command): # Send command
         time.sleep(1)
     except:
         print("Error transmitting command.")
-
+def addXBeeInput(input, data): # Takes input (string) and appends it to data (list of lists)
+    input = input.split(',')
+    tempLine = []
+    for item in input:
+        tempLine.append(item)
+    data.append(tempLine)
+    return data
+def readXBeeData(): # Read data from serial port
+    if (serialInst.is_open):
+        try:
+            data = serialInst.readline().strip() #maybe add .decode() before strip
+            if data:
+                # print(data)
+                processedData = data[data.find('1071'):(data.rfind('1071')-1)]
+                # Get the command
+                command = data[data.rfind('1071'):]
+                if (command[-1] == "'"): command = command[:-1]
+                # CONVERT COMMAND TO STRING
+                if (command == "1071,0,1"): command = "CXON"
+                elif (command == "1071,"): command = "FIXME"
+                # ADD STUFF ^^
+                # Add telemetry data to the list
+                processedData = processedData.split(',')
+                processedData.append(command)
+                print(processedData)
+                if (simulationMode == True):
+                    simulationData.append(processedData)
+                elif (backupMode == True):
+                    return
+                else:
+                    telemetryData.append(processedData) 
+        except:pass
 
 # Create and swwitch to custom look and feel
 sg.LOOK_AND_FEEL_TABLE['UFTheme'] = {'BACKGROUND': '#383535',
@@ -351,6 +375,7 @@ while True:
                 elif (CMD_ECHO == 'CMD,1071,SIM,DISABLE'):
                     simulationMode = False
                     simulationActivation = False
+                    simulationData = []
                     for item in figure_names: # Reset each of the 4 figures
                         updateChart(item) 
                     _VARS['window']['state'].update('State: LAUNCH_WAIT') 
@@ -381,7 +406,6 @@ while True:
                 # Power ON CanSat
                 elif (CMD_ECHO == 'CMD,1071,CX,ON'):
                     isCanSatON = True
-                    # Reset telemetry data?
                     telemetryData = []
                     _VARS['window']['Power ON'].update('Power OFF', button_color='#DA3A3A')
                 # Set time
@@ -443,6 +467,7 @@ while True:
         serialInst.port = input("Enter the port (e.g. \"COM4\"): ")
         try:
             serialInst.open()
+            print("Connected to port.")
         except:
             print("Error opening the port. Telemetry will not work.")
             pass
@@ -458,6 +483,9 @@ while True:
                 _VARS['window']['echo'].update('Command Echo: ' + str(simulatedPressureData[seconds])) #Update the command echo element to display the previously entered command
                 if serialInst.is_open:
                     sendXBeeCommand(simulatedPressureData[seconds])
+                    # MAYBE EDIT THIS
+                    time.sleep(1)
+                    readXBeeData() 
                 else:
                     print("Serial port is not open. " + simulatedPressureData[seconds])
             except:
@@ -483,6 +511,7 @@ while True:
             simulationMode = False
             simulationActivation = True
         elif simulationMode or simulationActivation:
+            simulationData = []
             CMD_ECHO = 'CMD,1071,SIM,DISABLE'
             _VARS['window']['echo'].update('Command Echo: ' + str(CMD_ECHO)) # Update the command echo element to display the previously entered command
             _VARS['window']['cmdInput'].update('')  # This resets the input bar to be empty
@@ -538,5 +567,14 @@ while True:
                 updateChart(item)   
         start = datetime.now()
         seconds = 0        
+
+# MAYBE EDIT THIS
+    try:
+        time.sleep(1)
+        if (serialInst.is_open):
+            if (serialInst.in_waiting):
+                readXBeeData()
+    except:pass
+# EDIT ABOVE
 
 _VARS['window'].close()
