@@ -135,8 +135,6 @@ def getSpecificTelemetryData(name):  # Gets specific backup data (temp, alt, etc
         xData.append(datetime.combine(datetime.today(), time_object))
     return (xData, yData) #Time versus whatever Y is (not GPS)
 
-
-
 def getTime(): # Get the current time
     return time.strftime("%H:%M:%S", time.localtime())
 def draw_figure(canvas, figure): # Draws a figure to be saved to the window's layout
@@ -484,7 +482,7 @@ def handle_data(data, flight_states,
         num_states |= (flight_states["state"] << 5)
         cmd = f"{teamID},5,0,{num_states},{package_count}"
         ser.write(cmd.encode('utf-8'))
-        print("Sat Ready")
+        _VARS['window']['echo'].update('Command Echo: Satellite Ready')
     else:
         shared_data.put(data)
         data_cont = data.split(",")
@@ -497,7 +495,8 @@ def handle_data(data, flight_states,
             flight_states["mast_bool"] = mast_bool_states[data_cont[8]]
             flight_states["packet_count"] = data_cont[2]
             flight_states["flight_mode"] = flight_mode_states[data_cont[3]]
-            flight_states["mission_time"] = 1
+            flight_states["mission_time"] = flight_mode_states[data_cont[1]]
+
         except IndexError:
             pass
 
@@ -629,28 +628,42 @@ try:
                 print("Error transmitting command.")
         # Connect to the serial port
         elif event == 'Connect':
-            ports = serial.tools.list_ports.comports()
-            for i, onePort in enumerate(ports):
-                print(i, onePort)
-            cont = False
-            port_num = 0
-            while (not cont):
-                temp = input("Enter the port number: ")
-                if temp.isdigit():
-                    port_num = int(temp)
-                    cont = True
 
+            ports = serial.tools.list_ports.comports()
+            port_num = 0;
+            window_txt = ""
+            for i, onePort in enumerate(ports):
+                window_txt += str(i) + " " + str(onePort) + "\n"
+            sg.set_options(font=('Rockwell', 16,))
+            sg.theme('UFTheme')  # Add a touch of color
+            # All the stuff inside your window.
+            layout1 = [[sg.Text(window_txt, auto_size_text=True)],
+                      [sg.Text('Port Number'), sg.InputText()],
+                      [sg.Button('Enter'), sg.Button('Cancel')]]
+            should_continue = False
+            # Create the Window
+            window = sg.Window('Select GCS-Port', layout1, resizable=True)
+            # Event Loop to process "events" and get the "values" of the inputs
+            while True:
+                event, values = window.read()
+                if event == sg.WIN_CLOSED or event == 'Cancel':  # if user closes window or clicks cancel
+                    break
+                elif event  == "Enter":
+                    if values[0].isnumeric():
+                        port_num = values[0]
+                        should_continue = True
+                        break
+            window.close()
+            if not should_continue: continue
             try:
                 ser = serial.Serial(
-                    port = ports[int(port_num)].name,
-                    # port='/dev/tty.usbserial-D30AXZ1V',  # Update this with the correct serial port of your device
+                    # port = ports[int(port_num)].name,
+                    port='/dev/tty.usbserial-D30AXZ1V',  # Update this with the correct serial port of your device
                     baudrate=9600,  # Update this with the correct baud rate of your device
                     timeout=1,  # Timeout value in seconds
                     xonxoff=True
                     # /dev/tty.usb* mac command
-
                 )
-
                 if ser.is_open:
                     print('Serial open')
                     # Start the thread to read data from the serial port
@@ -695,7 +708,7 @@ try:
                     simulationMode = False
                 seconds += 1
         # If user activates simulation mode
-        if event == 'simActivate':
+        if event == 'simActivate' and after_conneciton:
             simulationMode = True
             CMD_ECHO = 'CMD,1071,SIM,ACTIVATE'
             _VARS['window']['echo'].update('Command Echo: ' + str(CMD_ECHO)) # Update the command echo element to display the previously entered command
@@ -703,7 +716,7 @@ try:
             start = datetime.now()
             seconds = 0
         # If user enables/disables simulation mode
-        elif event == 'simEnable':
+        elif event == 'simEnable' and after_conneciton:
             if not simulationMode and not simulationActivation:
                 CMD_ECHO = 'CMD,1071,SIM,ENABLE'
                 _VARS['window']['echo'].update('Command Echo: ' + str(CMD_ECHO)) # Update the command echo element to display the previously entered command
@@ -732,7 +745,7 @@ try:
 
     # Backup Data Mode:
         # If backup mode is active
-        if backupMode == True:
+        if backupMode == True and after_conneciton:
             # _VARS['window']['simActivate'].update(visible = True)
             if (datetime.now() - start).seconds == seconds: # Every time a second passes
                 if seconds == 1 or seconds % 10 == 0 and seconds < len(backupData): # If it's the first second of simulation or every 10 seconds, update all of the graphs
