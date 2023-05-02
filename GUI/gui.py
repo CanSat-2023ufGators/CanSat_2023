@@ -179,25 +179,29 @@ def sendXBeeCommand(command): # Send command
     try:
         temp = ""
         if command == "CMD,1071,CX,ON":
-            temp = "1071,0,1"
+            temp = "1071,0,1,"
         elif command == "CMD,1071,CX,OFF":
-            temp = "1071,0,0,0,0"
+            temp = "1071,0,0,0,0,"
         elif command == "CMD,1071,ST,GPS":
-            temp = "1071,1,-1,0,0"
+            temp = "1071,1,-1,0,0,"
         elif command == "CMD,1071,SIM,DISABLE":
-            temp = "1071,2,0,0,0"
+            temp = "1071,2,0,0,0,"
         elif command == "CMD,1071,SIM,ACTIVATE":
-            temp = "1071,2,1,0,0"
+            temp = "1071,2,1,0,0,"
         elif command == "CMD,1071,SIM,ENABLE":
-            temp = "1071,2,2,0,0"
+            temp = "1071,2,2,0,0,"
         elif command == "CAL":
-            temp = "1071,4,0,0,0"
+            temp = "1071,4,0,0,0,"
         elif command == "CMD,1071,CAL":
-            temp = "1071,4,0,0,0"
+            temp = "1071,4,0,0,0,"
         elif command.find("SIMP") != -1:
-            temp = f"1071,3,0,{command.split(',')[-1]}"
+            temp = f"1071,3,0,{command.split(',')[-1]},"
         elif command.find("ST") != -1:
-            temp = f"1071,1,0,{command.split(',')[-1]}"
+            temp = f"1071,1,0,{command.split(',')[-1]},"
+        elif command.find("OPEN") != -1:
+            temp = f"1071,6,"
+        elif command.find("CLOSE") != -1:
+            temp = f"1071,7,"
         ser.write(temp.encode('utf-8'))
     except:
         print("Error transmitting command.")
@@ -495,7 +499,8 @@ def handle_data(data, flight_states,
             flight_states["mast_bool"] = mast_bool_states[data_cont[8]]
             flight_states["packet_count"] = data_cont[2]
             flight_states["flight_mode"] = flight_mode_states[data_cont[3]]
-            flight_states["mission_time"] = flight_mode_states[data_cont[1]]
+            temp_time = data_cont[1].split(':')
+            flight_states["mission_time"] = int(temp_time[0]) * 3600 + int(temp_time[1]) * 60 + int(temp_time[2])
 
         except IndexError:
             pass
@@ -525,7 +530,7 @@ try:
         if event == sg.WIN_CLOSED or event == 'Close':
             break
         # Send command
-        elif event == 'Send':
+        elif event == 'Send' and after_conneciton:
             CMD_ECHO = values['cmdInput']
             _VARS['window']['echo'].update('Command Echo: ' + str(CMD_ECHO)) # Update the command echo element to display the previously entered command
             _VARS['window']['cmdInput'].update('')  # This resets the input bar to be empty
@@ -657,8 +662,8 @@ try:
             if not should_continue: continue
             try:
                 ser = serial.Serial(
-                    # port = ports[int(port_num)].name,
-                    port='/dev/tty.usbserial-D30AXZ1V',  # Update this with the correct serial port of your device
+                    port = ports[int(port_num)].name,
+                    #port='/dev/tty.usbserial-D30AXZ1V',  # Update this with the correct serial port of your device
                     baudrate=9600,  # Update this with the correct baud rate of your device
                     timeout=1,  # Timeout value in seconds
                     xonxoff=True
