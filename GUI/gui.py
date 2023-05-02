@@ -190,7 +190,7 @@ def readXBeeData(): # Read data from serial port
                 # Add telemetry data to the list
                 processedData = processedData.split(',')
                 processedData.append(command)
-                print(processedData)
+                #print(processedData)
                 if (simulationMode == True):
                     simulationData.append(processedData)
                 elif (backupMode == False):
@@ -280,10 +280,8 @@ def getSpecificTelemetryData(name):  # Gets specific backup data (temp, alt, etc
         yData = np.array(tempYData) #LONGITUDE
         return (xData, yData) #Latitude vs Longitude
     xData = [] #MISSION TIME
-    for i in backupData[1:][:len(yData)]:
-        time_object = datetime.strptime(i[1][:-3], '%H:%M:%S').time()
-        # fix this later
-        xData.append(datetime.combine(datetime.today(), time_object))
+    for i in telemetryData[:-1]:
+        xData.append(i[1])
     return (xData, yData) #Time versus whatever Y is (not GPS)
 def drawChart(name): # Draws graph
     fig, ax=plt.subplots()
@@ -346,28 +344,33 @@ def drawChart(name): # Draws graph
     # If normal telemetry data is activated
     else:
         dataXY = getSpecificTelemetryData(name)
+
         if name != 'gps': # Format the x-axis for all figures NOT gps
             yearss_fmt = mdates.DateFormatter('%H:%M:%S')
             ax.xaxis.set_major_formatter(yearss_fmt)
         finalX = [] # Stores the x data to plot
         finalY = [] # Store the y data to plot
-        if len(dataXY) > 0 and len(dataXY[0]) > 0 and len(dataXY[1]) > 0:            
+        if len(dataXY) > 0 and len(dataXY[0]) > 0 and len(dataXY[1]) > 0:
             iterations = len(dataXY[0]) - 1
+            print(iterations)
             if (iterations > 0):
                 _VARS['window']['mode'].update('Mode: F') # Reset packet count (for simulation)
                 _VARS['window']['state'].update('State: ' + str(telemetryData[iterations][4])) # Update all of these things for the figure
                 _VARS['window']['heatshield'].update('Heat Shield Deployed: ' + str(telemetryData[iterations][6]))
                 _VARS['window']['parachute'].update('Parachute Deployed: ' + str(telemetryData[iterations][7]))
                 _VARS['window']['mast'].update('Mast Raised: ' + str(telemetryData[iterations][8]))
-                _VARS['window']['echo'].update('Command Echo: ' + str(telemetryData[iterations][20]))
+                _VARS['window']['echo'].update('Command Echo: ' + str(telemetryData[iterations][-1]))
+
                 for index in range(iterations):
                     finalX.append(dataXY[0][index]) # Add x data in form of datetime.datetime
                     finalY.append(dataXY[1][index]) # Add y data
-                    if name != 'gps':
-                        ax.plot(finalX, finalY, color = "blue") # Plot data colored blue
-                    else:
-                        ax.plot(finalX, finalY, color = "blue", linewidth = 0.75) # Make line width smaller for gps since the plot is weird (you'll see)
-    # Set axes titles, and labels
+                if name != 'gps':
+                    ax.plot(finalX, finalY, color = "blue") # Plot data colored blue
+                else:
+                    ax.plot(finalX, finalY, color = "blue", linewidth = 0.75) # Make line width smaller for gps since the plot is weird (you'll see)
+                print(finalY[:-1])
+                print(finalX[:-1])
+# Set axes titles, and labels
     xlabel = 'Time (min : sec)'
     if name == 'voltage':
         ylabel = 'Voltage (V)'
@@ -376,8 +379,8 @@ def drawChart(name): # Draws graph
         ylabel = 'Longitude (degrees)'
         xlabel = 'Latitude (degrees)' #Overwrite x-label
         title = 'Longitude versus latitude'
-        ax.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
-        ax.xaxis.set_major_formatter(FormatStrFormatter('%.3f'))
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.4f'))
+        ax.xaxis.set_major_formatter(FormatStrFormatter('%.4f'))
         plt.yticks(fontsize = 9)
         plt.xticks(fontsize = 9)
     elif name == 'altitude':
