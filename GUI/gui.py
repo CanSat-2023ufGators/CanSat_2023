@@ -17,7 +17,7 @@ import sys
 shared_data = queue.Queue()
 
 def saveCSVfile(data): # Saves telemetry data to CSV file
-    header = ['TEAM_ID', 'MISSION_TIME', 'PACKET_COUNT', 'MODE', 'STATE', 'ALTITUDE', 'HS_DEPLOYED', 'PC_DEPLOYED', 'MAST_RAISED', 'TEMPERATURE', 'VOLTAGE', 'GPS_TIME', 'GPS_ALTITUDE', 'GPS_LATITUDE', 'GPS_LONGITUDE', 'GPS_SATS', 'TILT_X', 'TILT_Y', 'CMD_ECHO']
+    header = ['TEAM_ID', 'MISSION_TIME', 'PACKET_COUNT', 'MODE', 'STATE', 'ALTITUDE', 'HS_DEPLOYED', 'PC_DEPLOYED', 'MAST_RAISED', 'TEMPERATURE', 'VOLTAGE', 'PRESSURE', 'GPS_TIME', 'GPS_ALTITUDE', 'GPS_LATITUDE', 'GPS_LONGITUDE', 'GPS_SATS', 'TILT_X', 'TILT_Y', 'CMD_ECHO']
     with open('Team_' + TEAM_ID+ '.csv', 'w', encoding='UTF8', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(header)
@@ -60,8 +60,8 @@ def getSpecificBackupData(name):  # Gets specific backup data (temp, alt, etc) f
         tempXData = []
         tempYData = []
         for i in backupData[1:]:
-            tempXData.append(float(i[13]))
-            tempYData.append(float(i[14]))
+            tempXData.append(float(i[14]))
+            tempYData.append(float(i[15]))
         xData = np.array(tempXData) #LATITUDE
         yData = np.array(tempYData) #LONGITUDE
         return (xData, yData) #Latitude vs Longitude
@@ -90,48 +90,14 @@ def getSpecificSimulationData(name):  # Gets specific simulation data (temp, alt
         tempXData = []
         tempYData = []
         for i in simulationData[1:]:
-            tempXData.append(float(i[13]))
-            tempYData.append(float(i[14]))
-        xData = np.array(tempXData) #LATITUDE
-        yData = np.array(tempYData) #LONGITUDE
-        return (xData, yData) #Latitude vs Longitude
-    xData = [] #MISSION TIME
-    for i in simulationData[1:]:
-        time_object = datetime.strptime(i[1][:-3], '%H:%M:%S').time()
-        xData.append(datetime.combine(datetime.today(), time_object))
-    return (xData, yData) #Time versus whatever Y is (not GPS)
-def getSpecificTelemetryData(name):  # Gets specific backup data (temp, alt, etc) from the backup data
-    if(name == "altitude"):
-        tempYData = []
-        print("ALT")
-        for i in telemetryData:
-            tempYData.append(float(i[5]))
-        yData = np.array(tempYData) #ALTITUDE
-        print(yData)
-    elif(name == 'temp'):
-        tempYData = []
-        for i in telemetryData:
-            tempYData.append(float(i[9]))
-        yData = np.array(tempYData) #TEMPERATURE
-    elif(name == 'voltage'):
-        tempYData = []
-        for i in telemetryData:
-            tempYData.append(float(i[11]))
-        yData = np.array(tempYData) #VOLTAGE
-    elif(name == 'gps'):
-        print("GPS")
-        tempXData = []
-        tempYData = []
-        for i in telemetryData:
             tempXData.append(float(i[14]))
             tempYData.append(float(i[15]))
         xData = np.array(tempXData) #LATITUDE
         yData = np.array(tempYData) #LONGITUDE
         return (xData, yData) #Latitude vs Longitude
     xData = [] #MISSION TIME
-    for i in backupData[1:][:len(yData)]:
+    for i in simulationData[1:]:
         time_object = datetime.strptime(i[1][:-3], '%H:%M:%S').time()
-        # fix this later
         xData.append(datetime.combine(datetime.today(), time_object))
     return (xData, yData) #Time versus whatever Y is (not GPS)
 
@@ -228,7 +194,7 @@ def readXBeeData(): # Read data from serial port
                 # Add telemetry data to the list
                 processedData = processedData.split(',')
                 processedData.append(command)
-                print(processedData)
+                #print(processedData)
                 if (simulationMode == True):
                     simulationData.append(processedData)
                 elif (backupMode == False):
@@ -271,7 +237,7 @@ voltage_layout = [[sg.Canvas(key='voltageCanvas', background_color='#FDF6E3')]]
 #Row layouts
 first_row = [[sg.Text('Team ID: '+ TEAM_ID, key = 'id'), sg.Text('Packet Count: ' + str(PACKET_COUNT), key = 'packet_count'), sg.Text('Mission Time: ' + getTime(), key='time'), sg.Button('Connect'), sg.Button('Power ON', button_color='#00b300'), sg.Button('Calibrate'), sg.Button('Close', button_color='#DA3A3A')]]
 second_row = [sg.Text('Mode: ' + str(MODE), key = 'mode'), sg.Text('State: ' + str(STATE), key = 'state'), sg.Text('Heat Shield Deployed: ' + HS_DEPLOYED, key = 'heatshield'), sg.Text('Parachute Deployed: ' + PC_DEPLOYED, key = 'parachute'), sg.Text('Mast Raised: ' + MAST_RAISED, key = 'mast')]
-third_row = [sg.Text(' '*15), sg.TabGroup([[sg.Tab('GPS', gps_layout, key='gps'), sg.Tab('Altitude', altitude_layout, key = 'altitude'), sg.Tab('Temperature', temp_layout, key = 'temp'), sg.Tab('Voltage', voltage_layout, key = 'voltage')]], enable_events=True)]
+third_row = [sg.Text(' '*15), sg.TabGroup([[sg.Tab('Altitude', altitude_layout, key = 'altitude'), sg.Tab('Temperature', temp_layout, key = 'temp'), sg.Tab('Voltage', voltage_layout, key = 'voltage'), sg.Tab('GPS', gps_layout, key='gps')]], enable_events=True)]
 fourth_row= [sg.Text(' '*15), sg.Button('Save CSV', size = (10,1)), sg.Button('Enable Simulation', key = 'simEnable', size = (20,1)), sg.Button('Activate Simulation', key = 'simActivate', size = (20,1), visible = False)]
 commands_row = [sg.Text('Command Bar: '), sg.Input(key = 'cmdInput'), sg.Button('Send'), sg.Button('Enable Backup Mode', key = 'backupMode')]
 command_echo_row = [sg.Text('Command Echo: ', key = 'echo')]
@@ -291,6 +257,36 @@ _VARS['window'] = sg.Window('CanSat GUI',
                             font = ("Rockwell", 13),
                             margins=(300,1))
 
+
+def getSpecificTelemetryData(name):  # Gets specific backup data (temp, alt, etc) from the backup data
+    if(name == "altitude"):
+        tempYData = []
+        for i in telemetryData:
+            tempYData.append(float(i[5]))
+        yData = np.array(tempYData) #ALTITUDE
+    elif(name == 'temp'):
+        tempYData = []
+        for i in telemetryData:
+            tempYData.append(float(i[9]))
+        yData = np.array(tempYData) #TEMPERATURE
+    elif(name == 'voltage'):
+        tempYData = []
+        for i in telemetryData:
+            tempYData.append(float(i[11]))
+        yData = np.array(tempYData) #VOLTAGE
+    elif(name == 'gps'):
+        tempXData = []
+        tempYData = []
+        for i in telemetryData:
+            tempXData.append(float(i[14]))
+            tempYData.append(float(i[15]))
+        xData = np.array(tempXData) #LATITUDE
+        yData = np.array(tempYData) #LONGITUDE
+        return (xData, yData) #Latitude vs Longitude
+    xData = [] #MISSION TIME
+    for i in telemetryData[:-1]:
+        xData.append(i[1])
+    return (xData, yData) #Time versus whatever Y is (not GPS)
 def drawChart(name): # Draws graph
     fig, ax=plt.subplots()
     _VARS[name + 'PltFig'] = fig
@@ -351,35 +347,34 @@ def drawChart(name): # Draws graph
 
     # If normal telemetry data is activated
     else:
-        print("Trying")
         dataXY = getSpecificTelemetryData(name)
-        print("Get data")
+
         if name != 'gps': # Format the x-axis for all figures NOT gps
             yearss_fmt = mdates.DateFormatter('%H:%M:%S')
             ax.xaxis.set_major_formatter(yearss_fmt)
         finalX = [] # Stores the x data to plot
         finalY = [] # Store the y data to plot
-
-        if dataXY and dataXY[0] and dataXY[1]:
-            print(dataXY)
+        if len(dataXY) > 0 and len(dataXY[0]) > 0 and len(dataXY[1]) > 0:
             iterations = len(dataXY[0]) - 1
+            print(iterations)
             if (iterations > 0):
-                print("GOT EHREER")
-                # _VARS['window']['mode'].update('Mode: F') # Reset packet count (for simulation)
-                # _VARS['window']['state'].update('State: ' + str(telemetryData[iterations][4])) # Update all of these things for the figure
-                # _VARS['window']['heatshield'].update('Heat Shield Deployed: ' + str(telemetryData[iterations][6]))
-                # _VARS['window']['parachute'].update('Parachute Deployed: ' + str(telemetryData[iterations][7]))
-                # _VARS['window']['mast'].update('Mast Raised: ' + str(telemetryData[iterations][8]))
-                # _VARS['window']['echo'].update('Command Echo: ' + str(telemetryData[iterations][20]))
+                _VARS['window']['mode'].update('Mode: F') # Reset packet count (for simulation)
+                _VARS['window']['state'].update('State: ' + str(telemetryData[iterations][4])) # Update all of these things for the figure
+                _VARS['window']['heatshield'].update('Heat Shield Deployed: ' + str(telemetryData[iterations][6]))
+                _VARS['window']['parachute'].update('Parachute Deployed: ' + str(telemetryData[iterations][7]))
+                _VARS['window']['mast'].update('Mast Raised: ' + str(telemetryData[iterations][8]))
+                _VARS['window']['echo'].update('Command Echo: ' + str(telemetryData[iterations][-1]))
+
                 for index in range(iterations):
-                    print("Data: " + dataXY)
                     finalX.append(dataXY[0][index]) # Add x data in form of datetime.datetime
                     finalY.append(dataXY[1][index]) # Add y data
-                    if name != 'gps':
-                        ax.plot(finalX, finalY, color = "blue") # Plot data colored blue
-                    else:
-                        ax.plot(finalX, finalY, color = "blue", linewidth = 0.75) # Make line width smaller for gps since the plot is weird (you'll see)
-    # Set axes titles, and labels
+                if name != 'gps':
+                    ax.plot(finalX, finalY, color = "blue") # Plot data colored blue
+                else:
+                    ax.plot(finalX, finalY, color = "blue", linewidth = 0.75) # Make line width smaller for gps since the plot is weird (you'll see)
+                print(finalY[:-1])
+                print(finalX[:-1])
+# Set axes titles, and labels
     xlabel = 'Time (min : sec)'
     if name == 'voltage':
         ylabel = 'Voltage (V)'
@@ -388,8 +383,8 @@ def drawChart(name): # Draws graph
         ylabel = 'Longitude (degrees)'
         xlabel = 'Latitude (degrees)' #Overwrite x-label
         title = 'Longitude versus latitude'
-        ax.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
-        ax.xaxis.set_major_formatter(FormatStrFormatter('%.3f'))
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.4f'))
+        ax.xaxis.set_major_formatter(FormatStrFormatter('%.4f'))
         plt.yticks(fontsize = 9)
         plt.xticks(fontsize = 9)
     elif name == 'altitude':
@@ -412,6 +407,7 @@ def drawChart(name): # Draws graph
     # Draw figure
     _VARS[name + '_agg'] = draw_figure( #
         _VARS['window'][name + 'Canvas'].TKCanvas, _VARS[name + 'PltFig'])
+    
 def updateChart(name): # Updates graph
     plt.close()
     _VARS[name + '_agg'].get_tk_widget().forget()
@@ -633,9 +629,8 @@ try:
                 print("Error transmitting command.")
         # Connect to the serial port
         elif event == 'Connect':
-
             ports = serial.tools.list_ports.comports()
-            port_num = 0;
+            port_num = 0
             window_txt = ""
             for i, onePort in enumerate(ports):
                 window_txt += str(i) + " " + str(onePort) + "\n"
@@ -691,23 +686,36 @@ try:
                     _VARS['window']['packet_count'].update('Packet Count: ' + PACKET_COUNT) # Reset packet count (for simulation)
                     try:
                         for item in figure_names: # Update each of the 4 figures
-                            updateChart("altitude")
+                            updateChart(item)
                     except:pass
                 else:            # For each data packet in the backup data, update the graph of the current tab
                     _VARS['window']['packet_count'].update('Packet Count: ' + PACKET_COUNT) # Update packet count
                     try:
-                        updateChart("altitude") # Update the chart of the tab that is active, if this fails (it shouldn't) then nothing happens
+                        updateChart(values[0]) # Update the chart of the tab that is active, if this fails (it shouldn't) then nothing happens
                     except:pass
 
     # Simulation Mode:
         # If simulation mode is activated AND enabled
-        if simulationMode == True and simulationActivation == True:
+        if isCanSatON and simulationMode == True and simulationActivation == True:
              if (datetime.now() - start).seconds == seconds: # Every time a second passes
                 try:
                     _VARS['window']['echo'].update('Command Echo: ' + str(simulatedPressureData[seconds])) #Update the command echo element to display the previously entered command
                     sendXBeeCommand(simulatedPressureData[seconds])
                     # MAYBE EDIT THIS
-                    readXBeeData()
+                    dataReceived = readXBeeData()
+                    if (dataReceived):
+                        PACKET_COUNT = flight_states["packet_count"]
+                        if int(PACKET_COUNT) == 1 or int(PACKET_COUNT) % 10 == 0: # If it's the first second of simulation or every 10 PACKET_COUNT, update all of the graphs
+                            _VARS['window']['packet_count'].update('Packet Count: ' + PACKET_COUNT) # Reset packet count (for simulation)
+                            try:
+                                for item in figure_names: # Update each of the 4 figures
+                                    updateChart(item)
+                            except:pass
+                        else:            # For each data packet in the backup data, update the graph of the current tab
+                            _VARS['window']['packet_count'].update('Packet Count: ' + PACKET_COUNT) # Update packet count
+                            try:
+                                updateChart(values[0]) # Update the chart of the tab that is active, if this fails (it shouldn't) then nothing happens
+                            except:pass
                 except:
                     print("All simulated pressure data has been transmitted. Ending simulation mode.")
                     simulationMode = False
